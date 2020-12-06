@@ -28,7 +28,7 @@ for i in range(100):
         for loss in train_loss:
             fout.write("{}\n".format(loss))
     
-    if (i + 1) % 10 == 0:
+    if (i + 1) % 20 == 0:
         test_loss, c, t = Model.Test(test_data, test_label)
         print("test, {} / {}, Accuracy: {}".format(c, t, 1.0*c/t))
         with open("./test_loss.txt", "w", encoding="utf8") as fout:
