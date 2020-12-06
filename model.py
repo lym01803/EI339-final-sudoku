@@ -11,8 +11,8 @@ class NetModel(nn.Module):
     def __init__(self, input_size, classes):
         super(NetModel, self).__init__()
         assert ((input_size - 8) % 4 == 0)
-        self.conv1 = nn.Conv2d(1, 6, 5)
-        self.conv2 = nn.Conv2d(6, 12, 3)
+        self.conv1 = nn.Conv2d(1, 4, 5)
+        self.conv2 = nn.Conv2d(4, 12, 3)
         self.pool = nn.MaxPool2d(2, 2)
         self.fc_s = (input_size // 4 - 2)
         self.fc1 = nn.Linear(12 * self.fc_s * self.fc_s, 240)
