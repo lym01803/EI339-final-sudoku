@@ -11,22 +11,22 @@ class NetModel(nn.Module):
     def __init__(self, input_size, classes):
         super(NetModel, self).__init__()
         assert ((input_size - 8) % 4 == 0)
-        self.conv1 = nn.Conv2d(1, 6, 5)
-        self.conv2 = nn.Conv2d(6, 16, 3)
+        self.conv1 = nn.Conv2d(1, 12, 5)
+        self.conv2 = nn.Conv2d(12, 48, 3)
         self.pool = nn.MaxPool2d(2, 2)
         self.fc_s = (input_size // 4 - 2)
-        self.fc1 = nn.Linear(16 * self.fc_s * self.fc_s, 240)
-        self.fc2 = nn.Linear(240, 120)
-        self.fc3 = nn.Linear(120, 84)
+        self.fc1 = nn.Linear(48 * self.fc_s * self.fc_s, 512)
+        self.fc2 = nn.Linear(512, 128)
+        self.fc3 = nn.Linear(128, 84)
         self.classes = classes
         self.fc4 = nn.Linear(84, self.classes)
-        self.activate = nn.ReLU()
+        self.activate = nn.LeakyReLU()
         self.dropout = nn.Dropout(0.25)
 
     def forward(self, x):
         x = self.pool(self.activate(self.dropout(self.conv1(x))))
         x = self.pool(self.activate(self.dropout(self.conv2(x))))
-        x = x.view(-1, 16 * self.fc_s * self.fc_s)
+        x = x.view(-1, 48 * self.fc_s * self.fc_s)
         x = self.activate(self.dropout(self.fc1(x)))
         x = self.activate(self.dropout(self.fc2(x)))
         x = self.activate(self.dropout(self.fc3(x)))
@@ -37,7 +37,7 @@ class DigitClassifier():
     def __init__(self, size=28, classes=9):
         self.size = size
         self.classes = classes
-        self.model = NetModel(self.size, self.classes)
+        self.model = NetModel(self.size, self.classes) #RSNet([4, 4, 4], classes=10) #NetModel(self.size, self.classes)
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
         
@@ -58,9 +58,9 @@ class DigitClassifier():
 
         self.model.train()
         for (i, (data, label)) in enumerate(data_loader):
-            self.optimizer.zero_grad()
             out = self.model(data)
             loss = self.criterion(out, label)
+            self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             loss_list.append(loss.item())
@@ -139,3 +139,83 @@ class DataLabel(torch.utils.data.Dataset):
     
     def __len__(self):
         return len(self.data)
+
+class RSNet(nn.Module):
+    def __init__(self, layers, channels=1, size=28, classes=9):
+        super(RSNet, self).__init__()
+        self.size = size
+        self.classes = classes
+        self.in_channels = 16
+        self.conv = nn.Conv2d(channels, self.in_channels, 5, stride=1, padding=2)
+        self.bn = nn.BatchNorm2d(self.in_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.pool1 = nn.MaxPool2d(2, 2)
+        self.size = (self.size + 1) // 2
+        self.layer1 = self.make_layer(self.in_channels, layers[0])
+        self.layer2 = self.make_layer(self.in_channels * 2, layers[1], 2)
+        self.size = (self.size + 1) // 2
+        self.layer3 = self.make_layer(self.in_channels * 2, layers[2], 2)
+        self.size = (self.size + 1) // 2
+        self.fc = FcBlock(3, [self.in_channels * self.size * self.size, 256, 64, self.classes])
+
+    def forward(self, x):
+        x = self.relu(self.bn(self.conv(x)))
+        x = self.pool1(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = x.view(-1, self.size * self.size * self.in_channels)
+        x = self.fc(x)
+        return x
+        
+    def make_layer(self, out_channels, blocks, stride=1):
+        downsample = None
+        if (stride != 1) or (self.in_channels != out_channels):
+            downsample = nn.Sequential(
+                nn.Conv2d(self.in_channels, out_channels, 3, stride=stride, padding=1),
+                nn.BatchNorm2d(out_channels)
+            )
+        layers = []
+        layers.append(ResBlock(self.in_channels, out_channels, stride, downsample))
+        self.in_channels = out_channels
+        for i in range(1, blocks):
+            layers.append(ResBlock(out_channels, out_channels))
+        return nn.Sequential(*layers)
+
+
+class ResBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1, downsample=None):
+        super(ResBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, 3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, 3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.dropout = nn.Dropout()
+        self.downsample = downsample
+
+    def forward(self, input):
+        residual = input
+        x = self.relu(self.bn1(self.conv1(input)))
+        x = self.dropout(x)
+        x = self.bn2(self.conv2(x))
+        if self.downsample:
+            residual = self.downsample(input)
+        x = x + residual
+        x = self.relu(x)
+        x = self.dropout(x)
+        return x
+
+class FcBlock(nn.Module):
+    def __init__(self, layers, dims):
+        super(FcBlock, self).__init__()
+        self.layers = []
+        for i in range(layers):
+            self.layers.append(nn.Linear(dims[i], dims[i+1]))
+            self.layers.append(nn.Dropout())
+            if i < layers - 1:
+                self.layers.append(nn.ReLU(inplace=True))
+        self.fc = nn.Sequential(*self.layers)
+    
+    def forward(self, x):
+        return self.fc(x)
