@@ -11,24 +11,26 @@ class NetModel(nn.Module):
     def __init__(self, input_size, classes):
         super(NetModel, self).__init__()
         assert ((input_size - 8) % 4 == 0)
-        self.conv1 = nn.Conv2d(1, 4, 5)
-        self.conv2 = nn.Conv2d(4, 12, 3)
+        self.conv1 = nn.Conv2d(1, 6, 5)
+        self.conv2 = nn.Conv2d(6, 16, 3)
         self.pool = nn.MaxPool2d(2, 2)
         self.fc_s = (input_size // 4 - 2)
-        self.fc1 = nn.Linear(12 * self.fc_s * self.fc_s, 240)
-        self.fc2 = nn.Linear(240, 80)
+        self.fc1 = nn.Linear(16 * self.fc_s * self.fc_s, 240)
+        self.fc2 = nn.Linear(240, 120)
+        self.fc3 = nn.Linear(120, 84)
         self.classes = classes
-        self.fc3 = nn.Linear(80, self.classes)
+        self.fc4 = nn.Linear(84, self.classes)
         self.activate = nn.ReLU()
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(0.25)
 
     def forward(self, x):
-        x = self.pool(self.activate(self.conv1(x)))
-        x = self.pool(self.activate(self.conv2(x)))
-        x = x.view(-1, 12 * self.fc_s * self.fc_s)
+        x = self.pool(self.activate(self.dropout(self.conv1(x))))
+        x = self.pool(self.activate(self.dropout(self.conv2(x))))
+        x = x.view(-1, 16 * self.fc_s * self.fc_s)
         x = self.activate(self.dropout(self.fc1(x)))
         x = self.activate(self.dropout(self.fc2(x)))
-        x = self.fc3(x)
+        x = self.activate(self.dropout(self.fc3(x)))
+        x = self.fc4(x)
         return x
 
 class DigitClassifier():
