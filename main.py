@@ -20,7 +20,7 @@ test_data = test_dataset.data
 test_label = test_dataset.targets
 
 Model = DigitClassifier(28, 10)
-save_pth = "./09model.pth"
+save_pth = "./RS18_09model.pth"
 for i in range(100):
     train_loss = Model.Train(train_data, train_label)
     print(i, sum(train_loss) / len(train_loss))
@@ -28,7 +28,7 @@ for i in range(100):
         for loss in train_loss:
             fout.write("{}\n".format(loss))
     
-    if (i + 1) % 20 == 0:
+    if (i + 1) % 10 == 0:
         test_loss, c, t = Model.Test(test_data, test_label)
         print("test, {} / {}, Accuracy: {}".format(c, t, 1.0*c/t))
         with open("./test_loss.txt", "w", encoding="utf8") as fout:
