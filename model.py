@@ -47,7 +47,7 @@ class DigitClassifier():
         self.model.to(self.device)
         self.train_count = 0
 
-    def Train(self, data, label):
+    def Train(self, data, label, half = 20):
         self.train_count += 1
         data = data.reshape(-1, 1, self.size, self.size)
         label = label.reshape(-1)
@@ -68,7 +68,7 @@ class DigitClassifier():
             self.optimizer.step()
             loss_list.append(loss.item())
         
-        if self.train_count % 10 == 0:
+        if self.train_count % 20 == 0:
             self.lr *= 0.5
             for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.lr
@@ -135,7 +135,7 @@ class DigitClassifier():
         self.model.load_state_dict(checkpoint["net"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
         self.lr = self.optimizer.param_groups[0]["lr"]
-        
+        return {"epoch": checkpoint["epoch"]}
 
 class DataLabel(torch.utils.data.Dataset):
     def __init__(self, data, label, device):
@@ -155,16 +155,18 @@ class RSNet18(nn.Module):
         self.channels = 64
         self.conv1 = nn.Conv2d(channels, self.channels, 3, stride=1, padding=1) #1
         self.bn1 = nn.BatchNorm2d(self.channels)
-        self.layer1 = self.make_layer(self.channels, 2, 1) #4
-        self.layer2 = self.make_layer(self.channels * 2, 2, 2) #4
-        self.layer3 = self.make_layer(self.channels * 2, 2, 2) #4
-        self.layer4 = self.make_layer(self.channels * 2, 2, 2) #4
+        self.relu = nn.ReLU(inplace=False)
+        self.layer1 = self.make_layer(self.channels, 2, 1) #4 64
+        self.layer2 = self.make_layer(self.channels * 2, 2, 2) #4 128
+        self.layer3 = self.make_layer(self.channels * 2, 2, 2) #4 256
+        self.layer4 = self.make_layer(self.channels * 2, 2, 2) #4 512
         self.GAP = nn.AdaptiveAvgPool2d((1, 1)) # Batch_size * self.channels * 1 * 1
         self.fc = FcBlock(2, [self.channels, 1000, classes]) 
         
     def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
+        x = self.relu(x)
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
@@ -194,7 +196,7 @@ class ResBlock(nn.Module):
         super(ResBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, 3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.conv2 = nn.Conv2d(out_channels, out_channels, 3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
         self.downsample = downsample
@@ -213,11 +215,12 @@ class FcBlock(nn.Module):
     def __init__(self, layers, dims):
         super(FcBlock, self).__init__()
         self.layers = []
+        self.relu = nn.LeakyReLU(inplace=False)
         for i in range(layers):
             self.layers.append(nn.Linear(dims[i], dims[i+1]))
-            self.layers.append(nn.Dropout())
+            self.layers.append(nn.Dropout(0.3))
             if i < layers - 1:
-                self.layers.append(nn.ReLU(inplace=True))
+                self.layers.append(self.relu)
         self.fc = nn.Sequential(*self.layers)
     
     def forward(self, x):
