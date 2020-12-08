@@ -15,7 +15,7 @@ cv2.waitKey(0)
 
 Model = DigitClassifier(28, 10)
 print("loading...")
-Model.load("./RS18_09model-80epoch.pth")
+Model.load("./RS18_09model.pth")
 print("loaded")
 
 P = Model.Predict(np.array([img]))

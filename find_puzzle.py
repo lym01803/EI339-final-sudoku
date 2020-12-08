@@ -52,13 +52,15 @@ def cutting(puzzle):
             y2 = (j + 1) * H // 9
             cell_img = puzzle[y1:y2, x1:x2]
             res = process_cell(cell_img)
+            #cv2.imshow("w", cell_img)
+            #cv2.waitKey(0)
             if not res is None:
                 pos.append((j, i))
                 L.append(res)
 
     L = np.array(L)
     Model = DigitClassifier(28, 10)
-    Model.load("./RS18_09model-10epoch.pth")
+    Model.load("./trained_models/RS18_09model.pth")
     print("loaded")
 
     P = Model.Predict(L)
@@ -75,7 +77,7 @@ def process_cell(img):
     #cv2.imshow("w", img)
     #cv2.waitKey(0)
     p = np.sum(img > 0) / (img.shape[0] * img.shape[1])
-    if (p < 0.03):
+    if (p < 0.05):
         return None
     return img
 
