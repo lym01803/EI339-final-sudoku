@@ -7,6 +7,7 @@ import numpy as np
 import warnings
 warnings.filterwarnings('ignore')
 
+
 class NetModel(nn.Module):
     def __init__(self, input_size, classes):
         super(NetModel, self).__init__()

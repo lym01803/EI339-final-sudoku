@@ -1,7 +1,5 @@
 *.jpg
 *.png
 *.pth
-MNIST/
 log/
-dancinglink/
 *.jpeg

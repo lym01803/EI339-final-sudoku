@@ -22,6 +22,7 @@ def report_accuracy(c, t):
     for i in range(20):
         print("{} : {} / {} , {:.2f}\%".format(ty[i], c[i], t[i], c[i]/t[i]*100))
 
+#整合两个不同来源的数据集
 train_data1 = train_dataset.data
 train_label1 = train_dataset.targets
 test_data1 = test_dataset.data
