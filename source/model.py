@@ -8,37 +8,41 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-class NetModel(nn.Module):
+class SimpleNet(nn.Module):
     def __init__(self, input_size, classes):
-        super(NetModel, self).__init__()
+        super(SimpleNet, self).__init__()
         assert ((input_size - 8) % 4 == 0)
-        self.conv1 = nn.Conv2d(1, 6, 5, stride=1, padding=2)
+        self.conv1 = nn.Conv2d(1, 6, 5, padding=2)
         self.conv2 = nn.Conv2d(6, 16, 5)
-        self.conv3 = nn.Conv2d(16, 48, 3)
+        #self.conv3 = nn.Conv2d(16, 48, 3)
         self.pool = nn.MaxPool2d(2, 2)
         self.fc_s = (input_size // 4 - 2)
-        self.fc1 = nn.Linear(48 * self.fc_s * self.fc_s, 1024)
-        self.fc2 = nn.Linear(1024, 1024)
+        self.fc1 = nn.Linear(16 * self.fc_s * self.fc_s, 120)
+        self.fc2 = nn.Linear(120, 84)
         self.classes = classes
-        self.fc3 = nn.Linear(1024, self.classes)
-        self.activate = nn.LeakyReLU()
-        self.dropout = nn.Dropout(0.25)
+        self.fc3 = nn.Linear(84, self.classes)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout()
+        self.bn1 = nn.BatchNorm2d(6)
+        self.bn2 = nn.BatchNorm2d(16)
 
     def forward(self, x):
-        x = self.activate(self.dropout(self.conv1(x)))
-        x = self.pool(self.activate(self.dropout(self.conv2(x))))
-        x = self.pool(self.activate(self.dropout(self.conv3(x))))
-        x = x.view(-1, 48 * self.fc_s * self.fc_s)
-        x = self.activate(self.dropout(self.fc1(x)))
-        x = self.activate(self.dropout(self.fc2(x)))
+        x = self.pool(self.relu(self.bn1(self.conv1(x))))
+        x = self.pool(self.relu(self.bn2(self.conv2(x))))
+        x = x.view(-1, 16 * self.fc_s * self.fc_s)
+        x = self.relu(self.dropout(self.fc1(x)))
+        x = self.relu(self.dropout(self.fc2(x)))
         x = self.fc3(x)
         return x
 
 class DigitClassifier():
-    def __init__(self, size=28, classes=9):
+    def __init__(self, size, classes, method="RSNet18"):
         self.size = size
         self.classes = classes
-        self.model = RSNet18(1, size, classes) #NetModel(self.size, self.classes)
+        if method == "RSNet18":
+            self.model = RSNet18(1, size, classes) 
+        elif method == "SimpleNet":
+            self.model = SimpleNet(self.size, self.classes)
         self.criterion = nn.CrossEntropyLoss()
         self.lr = 0.001
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
@@ -56,25 +60,29 @@ class DigitClassifier():
         label = torch.tensor(label, dtype=torch.long)
         data = data / 255.0
 
-        data_loader = torch.utils.data.DataLoader(dataset=DataLabel(data, label, self.device), batch_size=32, shuffle=True)
+        data_loader = torch.utils.data.DataLoader(dataset=DataLabel(data, label, self.device), batch_size=64, shuffle=True)
 
         loss_list = []
-
+        total = 0
+        correct = 0
         self.model.train()
         for (i, (data, label)) in enumerate(data_loader):
             out = self.model(data)
+            out_label = torch.argmax(out, 1)
+            correct += torch.sum(out_label == label)
+            total += out.shape[0]
             loss = self.criterion(out, label)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
             loss_list.append(loss.item())
         
-        if self.train_count % 20 == 0:
+        if self.train_count % 25 == 0:
             self.lr *= 0.5
             for param_group in self.optimizer.param_groups:
                 param_group["lr"] = self.lr
-
-        return loss_list
+        correct = correct.to("cpu").numpy()
+        return loss_list, correct / total
 
     def Test(self, data, label):
         data = data.reshape(-1, 1, self.size, self.size)
@@ -217,8 +225,8 @@ class FcBlock(nn.Module):
         self.relu = nn.LeakyReLU(inplace=False)
         for i in range(layers):
             self.layers.append(nn.Linear(dims[i], dims[i+1]))
-            self.layers.append(nn.Dropout(0.3))
             if i < layers - 1:
+                self.layers.append(nn.Dropout())
                 self.layers.append(self.relu)
         self.fc = nn.Sequential(*self.layers)
     
