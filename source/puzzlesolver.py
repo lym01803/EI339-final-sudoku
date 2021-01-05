@@ -57,6 +57,7 @@ def cutting(puzzle, Model):
     W = puzzle.shape[1]
     pos = list()
     L = list()
+    preprocess_imgs = [[None for i in range(9)] for j in range(9)]
     for i in range(9):
         for j in range(9):
             x1 = i * W // 9
@@ -64,7 +65,7 @@ def cutting(puzzle, Model):
             y1 = j * H // 9
             y2 = (j + 1) * H // 9
             cell_img = puzzle[y1:y2, x1:x2]
-            res = process_cell(cell_img, i, j)
+            res, preprocess_imgs[j][i] = process_cell(cell_img, i, j)
             #cv2.imshow("w", cell_img)
             #cv2.waitKey(0)
             if not res is None:
@@ -80,7 +81,7 @@ def cutting(puzzle, Model):
         Sudoku[pos[i][0]][pos[i][1]] = label_to_number[P[i]]
         with open("../log/predict_report.txt", "a", encoding="utf8") as fout:
             fout.write("------------\n{}, {}\n{}\n{}\n".format(pos[i], P[i], O[i], SO[i]))
-    return Sudoku
+    return Sudoku, preprocess_imgs
 
 def max_pool(img_in, size):
     img_out = img_in.copy()
@@ -105,8 +106,8 @@ def process_cell(img, i, j):
     #print(img)
     p = np.sum(img) / (img.shape[0] * img.shape[1])
     if (p < 1):
-        return None
-    return img
+        return None, img
+    return img, img
 
 def r_check(g, r):
     cnt = [0 for i in range(10)]
