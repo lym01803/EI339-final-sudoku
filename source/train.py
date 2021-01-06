@@ -47,6 +47,7 @@ print("Data Set Size:\n", train_data.shape, train_label.shape, test_data.shape, 
 
 Model = DigitClassifier(size=28, classes=18, method="RSNet18")
 save_pth = "../trained_models/RSNet18_2021.pth"
+
 start = 0
 if (len(sys.argv) >= 3) and sys.argv[1] == "load":
     state = Model.load(sys.argv[2])
@@ -69,4 +70,3 @@ for i in range(start, 100):
                 fout.write("{}\n".format(loss))
         print("Saving...")
         Model.save(path="../trained_models/RSNet18_2021_epoch{}.pth".format(i+1), epoch=i)
-
